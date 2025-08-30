@@ -1,0 +1,59 @@
+# Emacs backup files
+*~     
+\#*\#     
+.\#*
+
+# Lisp compiled artifacts
+*.fasl
+*.fas
+*.lib
+*.x86f
+*.lx64fsl
+*.lx64f
+*.dfsl
+*.pfsl
+*.ufsl
+*.fsl
+*.faso
+*.fasl64
+
+# SLIME / REPL temp files
+slime-fuzzy.elc
+slime-autoloads.el
+slime.elc
+
+# SBCL core files
+*.core
+
+# Clozure CL heap images
+*.image
+*.dx64fsl
+*.dx32fsl
+
+# Quicklisp cache
+.quicklisp/
+
+# ASDF cache
+.cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Icon?
+.Spotlight-V100
+.Trashes
+._*
+
+# Logs / temp / outputs
+*.log
+*.tmp
+*.aux
+*.out
+*.pdf
+*.html
+*.png
+*.jpg
+
+# Large data (adjust to your project)
+data/raw/

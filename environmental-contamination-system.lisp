@@ -2,7 +2,23 @@
 
 (in-package :anesthesia-sim)
 
-;;; Environmental Gas Source (simulates room air contamination)
+;;; 1) Patient with Environmental Gas Absorption
+
+(defclass environmentally-exposed-patient (patient)
+  ((baseline-rr :accessor baseline-rr :initform 12.0)
+   (co-absorption-rate :initarg :co-absorption-rate :accessor co-absorption-rate 
+                       :initform 0.95 :documentation "CO absorption efficiency")
+   (toxin-sensitivity :initarg :toxin-sensitivity :accessor toxin-sensitivity
+                      :initform 1.0 :documentation "Sensitivity to environmental toxins")
+   (carboxyhemoglobin :accessor carboxyhemoglobin :initform 0.0
+                      :documentation "COHb percentage")
+   (exposure-time :accessor exposure-time :initform 0.0)))
+
+
+(defmethod initialize-instance :after ((p environmentally-exposed-patient) &key)
+  (setf (baseline-rr p) (respiratory-rate p)))
+
+;;; 2) Environmental Gas Source (simulates room air contamination)
 
 (defclass environmental-gas-source (gas-component)
   ((co-level :initarg :co-level :accessor co-level :initform 0.0
@@ -14,9 +30,6 @@
                        :documentation "Rate of room air leaking into circuit (L/min)")
    (fire-intensity :initarg :fire-intensity :accessor fire-intensity :initform 0.0
                    :documentation "Fire intensity (0-1) affecting gas production")))
-
-(defmethod initialize-instance :after ((p environmentally-exposed-patient) &key)
-  (setf (baseline-rr p) (respiratory-rate p)))
 
 (defmethod process-gas ((env-source environmental-gas-source) input-stream dt)
   "Add environmental contamination to gas stream."
@@ -63,7 +76,7 @@
       ;; No contamination - pass through
       (or input-stream (make-instance 'gas-stream :flow-rate 0.0))))
 
-;;; Enhanced Fresh Gas Inlet with Environmental Contamination
+;;; 3) Fresh Gas Inlet with leak mixing
 
 (defclass contaminated-fresh-gas-inlet (fresh-gas-inlet)
   ((room-air-leak :initarg :room-air-leak :accessor room-air-leak :initform 0.0
@@ -89,17 +102,7 @@
                 clean-output)))
         clean-output)))
 
-;;; Patient with Environmental Gas Absorption
-
-(defclass environmentally-exposed-patient (patient)
-  ((baseline-rr :accessor baseline-rr :initform 12.0)
-   (co-absorption-rate :initarg :co-absorption-rate :accessor co-absorption-rate 
-                       :initform 0.95 :documentation "CO absorption efficiency")
-   (toxin-sensitivity :initarg :toxin-sensitivity :accessor toxin-sensitivity
-                      :initform 1.0 :documentation "Sensitivity to environmental toxins")
-   (carboxyhemoglobin :accessor carboxyhemoglobin :initform 0.0
-                      :documentation "COHb percentage")
-   (exposure-time :accessor exposure-time :initform 0.0)))
+;;; 4) Methods specialized on environmentally-exposed-patient
 
 (defmethod compute-target-fractions ((patient environmentally-exposed-patient) input-stream)
   "Enhanced gas exchange with environmental toxin handling."

@@ -2,46 +2,26 @@
 
 (in-package :anesthesia-sim)
 
-(defun make-complete-circle-system ()
-  "Create a complete anesthesia circuit with one-way valves and patient."
-  (let ((circuit (make-instance 'anesthesia-circuit))
-        ;; Gas sources
-        (fgf-inlet (make-instance 'fresh-gas-inlet :name "FGF"
-                                  :o2-flow 1.0 :air-flow 1.0))
-        (sevo-vap (make-instance 'vaporizer :name "sevoflurane-vap" 
-                                 :agent "sevoflurane" :setting 2.0 :open-p t))
-        
-        ;; Circuit components
-        (insp-valve (make-instance 'one-way-valve :name "inspiratory-valve"))
-        (exp-valve (make-instance 'one-way-valve :name "expiratory-valve"))
-        (absorber (make-instance 'co2-absorber :name "CO2-absorber"))
-        (insp-limb (make-instance 'gas-mixer :name "inspiratory-limb" :volume 1.0))
-        (exp-limb (make-instance 'gas-mixer :name "expiratory-limb" :volume 1.0))
-        
-        ;; Patient
-        (patient (make-instance 'simple-lung :name "patient")))
-    
-    ;; Add all components
-    (dolist (comp (list fgf-inlet sevo-vap insp-valve exp-valve 
-                       absorber insp-limb exp-limb patient))
-      (add-component circuit comp))
-    
-    ;; Create the circular topology using new interface
-    ;; Fresh gas path: FGF -> Vaporizer -> Absorber -> Inspiratory limb
-    (add-connection circuit fgf-inlet sevo-vap)
-    (add-connection circuit sevo-vap absorber)
-    (add-connection circuit absorber insp-limb)
-    
-    ;; To patient: Inspiratory limb -> Inspiratory valve -> Patient
-    (add-connection circuit insp-limb insp-valve)
-    (add-connection circuit insp-valve patient)
-    
-    ;; From patient: Patient -> Expiratory valve -> Expiratory limb -> Absorber
-    (add-connection circuit patient exp-valve)
-    (add-connection circuit exp-valve exp-limb)
-    (add-connection circuit exp-limb absorber) ; This closes the circle!
-    
-    circuit))
+(defun order-circle-components! (circ)
+  (let* ((wanted '("FGF"
+                   "sevoflurane-vap"
+                   "inspiratory-valve"
+                   "inspiratory-limb"
+                   "Y-piece-dead"
+                   "ETT-dead-space"
+                   ;; accept either base patient or the replaced one
+                   "controlled-patient" "patient"
+                   "capnometer-exp-port"       ; sensor right at the Y on the exp side
+                   "expiratory-valve"
+                   "expiratory-limb"
+                   "CO2-absorber"
+                   "vol-reflector"))
+         (comps   (copy-list (components circ)))
+         (take    (lambda (nm) (find nm comps :key #'name :test #'string=)))
+         (ordered (remove nil (mapcar take wanted)))
+         (rest    (remove-if (lambda (c) (member (name c) wanted :test #'string=)) comps)))
+    (setf (components circ) (nconc ordered rest))
+    circ))
 
 (defun make-auxiliary-o2-system ()
   "Create a simple auxiliary O2 delivery system."
@@ -95,11 +75,12 @@
                                  :operating-temp 22.0))
          
          ;; Circuit components
-         (insp-valve (make-instance 'one-way-valve :name "inspiratory-valve"))
-         (exp-valve (make-instance 'one-way-valve :name "expiratory-valve"))
+         (insp-valve (make-instance 'one-way-valve :name "inspiratory-valve" :role :inspiratory))
+         (exp-valve (make-instance 'one-way-valve :name "expiratory-valve" :role :expiratory))
          (absorber (make-instance 'co2-absorber :name "CO2-absorber"))
          (insp-limb (make-instance 'gas-mixer :name "inspiratory-limb" :volume 1.0))
          (exp-limb (make-instance 'gas-mixer :name "expiratory-limb" :volume 1.0))
+	 (cap (make-instance 'capnometer-port :name "capnometer-exp-port"))
          
          ;; Dead spaces
          (ett-dead-space (make-instance 'dead-space :name "ETT-dead-space"
@@ -112,15 +93,13 @@
                                           :reflector-volume 2000.0)))
     
     ;; Add all components INCLUDING the patient
-    (dolist (comp (list fgf-inlet sevo-vap insp-valve exp-valve absorber
-                       insp-limb exp-limb ett-dead-space y-piece-dead
-                       volume-reflector patient))
+    (dolist (comp (list fgf-inlet sevo-vap absorber insp-limb insp-valve y-piece-dead 
+                       ett-dead-space patient cap exp-valve exp-limb volume-reflector))
       (add-component circuit comp))
     
     ;; Build the complete topology
     (add-connection circuit fgf-inlet sevo-vap)
-    (add-connection circuit sevo-vap volume-reflector)
-    (add-connection circuit volume-reflector absorber)
+    (add-connection circuit sevo-vap absorber)
     (add-connection circuit absorber insp-limb)
     (add-connection circuit insp-limb insp-valve)
     (add-connection circuit insp-valve y-piece-dead)
@@ -130,7 +109,8 @@
     ;; Return path
     (add-connection circuit patient ett-dead-space)
     (add-connection circuit ett-dead-space y-piece-dead) 
-    (add-connection circuit y-piece-dead exp-valve)
+    (add-connection circuit y-piece-dead cap)
+    (add-connection circuit cap exp-valve)
     (add-connection circuit exp-valve exp-limb)
     (add-connection circuit exp-limb absorber) ; Close the circle
     

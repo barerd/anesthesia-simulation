@@ -673,22 +673,20 @@
 ;;; ====================================================================
 
 (defun make-controlled-respiratory-system (&key (patient-type 'healthy) (initial-mode "auxiliary-o2"))
-  "Create a complete system with respiratory control."
   (let* ((base-circuit (make-circle-system :patient-type patient-type))
          (controlled-patient (make-instance 'controlled-patient
-                                            :name "controlled-patient"
-                                            :tidal-volume 500.0
-                                            :respiratory-rate 12.0))
+                               :name "controlled-patient"
+                               :tidal-volume 500.0
+                               :respiratory-rate 12.0))
          (machine (make-instance 'anesthesia-machine)))
-    
-    ;; Replace the basic patient with controlled patient
-    (replace-patient base-circuit controlled-patient)
 
+    (replace-patient base-circuit controlled-patient)
     (setf (controller-circuit (respiratory-controller controlled-patient)) base-circuit)
-    
-    ;; Set initial ventilation mode
+
+    ;; Reorder AFTER replacement so the wanted name is present.
+    (order-circle-components! base-circuit)
+
     (switch-ventilation-mode (respiratory-controller controlled-patient) initial-mode)
-    
     (format t "Created controlled respiratory system with ~A mode~%" initial-mode)
     (values base-circuit controlled-patient machine)))
 

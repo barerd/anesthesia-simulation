@@ -72,7 +72,10 @@
 ;;; One-Way Valve Component
 
 (defclass one-way-valve (gas-component)
-  ((cracking-pressure :initarg :cracking-pressure :accessor cracking-pressure 
+  ((name :initarg :name :accessor name)
+   ;; :inspiratory OR :expiratory
+   (role :initarg :role :accessor role :initform :inspiratory)
+   (cracking-pressure :initarg :cracking-pressure :accessor cracking-pressure 
                       :initform 0.1 :documentation "Minimum pressure to open (cmH2O)")
    (resistance :initarg :resistance :accessor resistance 
                :initform 0.1 :documentation "Flow resistance when open")
@@ -111,6 +114,35 @@
       
       ;; Zero flow
       (t input-stream))))
+
+(defmethod process-gas :around ((valve one-way-valve) input-stream dt)
+  "Hard gate by role + flow sign before the primary method runs."
+  (declare (ignore dt))
+  (let ((flow (and input-stream (flow-rate input-stream))))
+    ;; For our simulator, 'forward' through both valves is flow >= 0.
+    ;; Any negative flow trying to go back through the valve is blocked here.
+    (when (and flow (< flow 0.0))
+      (setf (is-open valve) nil)
+      (return-from process-gas (make-instance 'gas-stream :flow-rate 0.0))))
+  ;; If we didn’t return above, let your primary method do the pressure/ΔP logic.
+  (call-next-method))
+
+;;; Capnometer sensor
+
+(defclass capnometer-port ()
+  ((name :initarg :name :accessor name :initform "capnometer-exp-port")))
+
+(defmethod process-gas ((cap capnometer-port) input-stream dt)
+  (declare (ignore dt))
+  (if (and input-stream (typep input-stream 'gas-stream))
+      (make-instance 'gas-stream
+        :flow-rate 0.0
+        :fractions (clone-hash (fractions input-stream))
+        :temperature (temperature input-stream)
+        :pressure    (pressure    input-stream)
+        :humidity    (humidity    input-stream))
+      ;; No input? Still return a zero-flow stream so downstream code is happy.
+      (make-instance 'gas-stream :flow-rate 0.0)))
 
 ;;; Dead Space Modeling
 

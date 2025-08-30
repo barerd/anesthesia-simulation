@@ -5,7 +5,7 @@
 (defun hash-table-alist (hash-table)
   "Convert hash table to association list for printing."
   (loop for key being the hash-keys of hash-table
-        using (hash-value value)
+          using (hash-value value)
         collect (cons key value)))
 
 (defun clone-hash (ht)
@@ -51,3 +51,17 @@
   "Check if two numbers are approximately equal within tolerance."
   (< (abs (- a b)) tolerance))
 
+(defun %hash-sum (ht)
+  (let ((s 0.0)) (maphash (lambda (_ v) (declare (ignore _)) (incf s v)) ht) s))
+
+(defun %clone-fractions (ht)
+  (let ((h (make-hash-table :test 'equal)))
+    (maphash (lambda (k v) (setf (gethash k h) v)) ht) h))
+
+(defvar *last-expired-stream* (make-hash-table :test #'eq))
+
+(defun %set-last-expired (patient stream)
+  (setf (gethash patient *last-expired-stream*) stream))
+
+(defun last-expired-stream (patient)
+  (gethash patient *last-expired-stream*))
